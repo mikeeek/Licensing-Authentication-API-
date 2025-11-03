@@ -24,7 +24,6 @@ public class CorrelationIdMiddleware
             ? ctx.User.Identity!.Name ?? "(token)"
             : "(anonymous)";
 
-        // Route template (e.g. /auth/check)
         var endpoint = ctx.Request.Path.Value ?? "(unknown)";
 
         // Start timer
