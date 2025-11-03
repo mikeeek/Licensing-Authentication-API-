@@ -75,17 +75,44 @@ jobs:
             if az containerapp show -g $RG_NAME -n $ACA_APP_NAME >/dev/null 2>&1; then
               echo "App exists → updating image & environment variables"
 
-              az containerapp update \
-                -g $RG_NAME -n $ACA_APP_NAME \
-                --image "$IMAGE" \
-                --set-env-vars \
-                  ASPNETCORE_ENVIRONMENT=Production \
-                  ASPNETCORE_URLS=http://0.0.0.0:${PORT} \
-                  Mongo__ConnectionString='${{ secrets.MONGO_CONNECTION_STRING }}' \
-                  Mongo__Database='${{ secrets.MONGO_DATABASE }}' \
-                  Auth__JwtKey='${{ secrets.JWT_KEY }}' \
-                  Auth__JwtIssuer='${{ secrets.JWT_ISSUER }}' \
-                  Auth__JwtAudience='${{ secrets.JWT_AUDIENCE }}'
+              # Retry logic for concurrent operation conflicts
+              MAX_RETRIES=5
+              RETRY_COUNT=0
+              RETRY_DELAY=30
+
+              while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                echo "Attempt $(($RETRY_COUNT + 1)) of $MAX_RETRIES..."
+
+                if az containerapp update \
+                  -g $RG_NAME -n $ACA_APP_NAME \
+                  --image "$IMAGE" \
+                  --set-env-vars \
+                    ASPNETCORE_ENVIRONMENT=Production \
+                    ASPNETCORE_URLS=http://0.0.0.0:${PORT} \
+                    Mongo__ConnectionString='${{ secrets.MONGO_CONNECTION_STRING }}' \
+                    Mongo__Database='${{ secrets.MONGO_DATABASE }}' \
+                    Auth__JwtKey='${{ secrets.JWT_KEY }}' \
+                    Auth__JwtIssuer='${{ secrets.JWT_ISSUER }}' \
+                    Auth__JwtAudience='${{ secrets.JWT_AUDIENCE }}' 2>&1 | tee /tmp/update_output.log; then
+
+                  echo "Update successful!"
+                  break
+                else
+                  if grep -q "ContainerAppOperationInProgress" /tmp/update_output.log; then
+                    RETRY_COUNT=$(($RETRY_COUNT + 1))
+                    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                      echo "Operation in progress. Waiting ${RETRY_DELAY}s before retry..."
+                      sleep $RETRY_DELAY
+                    else
+                      echo "Max retries reached. Deployment failed."
+                      exit 1
+                    fi
+                  else
+                    echo "Update failed with non-retryable error"
+                    exit 1
+                  fi
+                fi
+              done
 
               az containerapp ingress update \
                 -g $RG_NAME -n $ACA_APP_NAME \
