@@ -95,7 +95,7 @@ public static class AuthenticationEndpoints
                 logger.LogError(ex, "Error during registration for username: {Username}", req.Username);
                 return Results.Problem(
                     title: "Registration failed",
-                    detail: ex.Message,
+                    detail: "An unexpected error occurred. Please try again",
                     statusCode: 500
                 );
             }
