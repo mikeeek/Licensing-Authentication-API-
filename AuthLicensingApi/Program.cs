@@ -7,8 +7,11 @@ using AuthLicensingApi.Models;
 using MongoDB.Driver;
 using Serilog;
 
-// Configure Serilog
-LoggingExtensions.ConfigureSerilog();
+// Get Application Insights connection string (optional)
+var appInsightsConnectionString = Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
+
+// Configure Serilog with Application Insights
+LoggingExtensions.ConfigureSerilog(appInsightsConnectionString);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +44,15 @@ var licenses = db.GetCollection<License>("licenses");
 var jwtKey = builder.Configuration["Auth:JwtKey"]!;
 var jwtIssuer = builder.Configuration["Auth:JwtIssuer"]!;
 var jwtAudience = builder.Configuration["Auth:JwtAudience"]!;
+
+// Application Insights telemetry
+if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
+{
+    builder.Services.AddApplicationInsightsTelemetry(options =>
+    {
+        options.ConnectionString = appInsightsConnectionString;
+    });
+}
 
 // Add services using extension methods
 builder.Services.AddJwtAuthentication(jwtKey, jwtIssuer, jwtAudience);

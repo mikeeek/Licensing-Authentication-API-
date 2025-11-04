@@ -93,7 +93,8 @@ jobs:
                     Mongo__Database='${{ secrets.MONGO_DATABASE }}' \
                     Auth__JwtKey='${{ secrets.JWT_KEY }}' \
                     Auth__JwtIssuer='${{ secrets.JWT_ISSUER }}' \
-                    Auth__JwtAudience='${{ secrets.JWT_AUDIENCE }}' 2>&1 | tee /tmp/update_output.log; then
+                    Auth__JwtAudience='${{ secrets.JWT_AUDIENCE }}' \
+                    APPLICATIONINSIGHTS_CONNECTION_STRING='${{ secrets.APPINSIGHTS_CONNECTION_STRING }}' 2>&1 | tee /tmp/update_output.log; then
 
                   echo "Update successful!"
                   break
@@ -132,6 +133,7 @@ jobs:
                   Auth__JwtKey='${{ secrets.JWT_KEY }}' \
                   Auth__JwtIssuer='${{ secrets.JWT_ISSUER }}' \
                   Auth__JwtAudience='${{ secrets.JWT_AUDIENCE }}' \
+                  APPLICATIONINSIGHTS_CONNECTION_STRING='${{ secrets.APPINSIGHTS_CONNECTION_STRING }}' \
                 --ingress external --target-port $PORT --transport auto \
                 --cpu 0.5 --memory 1.0Gi \
                 --registry-server docker.io \

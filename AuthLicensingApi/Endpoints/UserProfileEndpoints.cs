@@ -12,20 +12,30 @@ public static class UserProfileEndpoints
         IMongoCollection<User> users,
         IMongoCollection<License> licenses)
     {
-        app.MapGet("/me", [Authorize] async (HttpContext ctx) =>
+        app.MapGet("/me", [Authorize] async (HttpContext ctx, ILogger<Program> logger) =>
         {
             var username = ctx.User.Identity?.Name ?? "(unknown)";
             var level = ctx.User.Claims.FirstOrDefault(c => c.Type == "level")?.Value ?? "(none)";
             var licenseKey = ctx.User.Claims.FirstOrDefault(c => c.Type == "licenseKey")?.Value ?? "(none)";
 
+            logger.LogInformation("User profile request for: {Username}", username);
+
             var user = await users.Find(u => u.Username == username).FirstOrDefaultAsync();
             var license = await licenses.Find(l => l.Key == licenseKey).FirstOrDefaultAsync();
 
             if (user is null || license is null)
+            {
+                logger.LogWarning("Profile retrieval failed: User or license not found for {Username}, License: {LicenseKey}", username, licenseKey);
                 return Results.NotFound("User or license not found.");
+            }
 
             if (license.Subscription is null)
+            {
+                logger.LogError("Profile retrieval failed: License has no subscription data for {Username}, License: {LicenseKey}", username, licenseKey);
                 return Results.Problem("License has no subscription data", statusCode: 500);
+            }
+
+            logger.LogInformation("User profile retrieved successfully for: {Username}", username);
 
             return Results.Ok(new
             {

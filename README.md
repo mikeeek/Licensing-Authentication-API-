@@ -53,7 +53,21 @@ Each log entry includes:
 - HTTP status code
 - Response time
 
-### 📚 Swagger / OpenAPI Documentation
+### Application Insights Integration
+Comprehensive telemetry and monitoring for Azure deployments:
+
+**Automatic Tracking:**
+- Request telemetry (response times, status codes)
+- Dependency tracking (MongoDB calls)
+- Exception logging
+- Custom events and metrics
+
+**Serilog Integration:**
+- All Serilog logs automatically sent to Application Insights
+- Structured logging with correlation IDs
+- Exception tracking with full stack traces
+
+### Swagger / OpenAPI Documentation
 Interactive API documentation with built-in JWT authorization testing
 
 
@@ -99,7 +113,7 @@ sequenceDiagram
 
 1. **Register**: Client calls `/register` with username and password
 2. **Login**: Client authenticates via `/auth/check` 
-3. **Token**: Server verifies credentials → returns JWT token
+3. **Token**: Server verifies credentials - returns JWT token
 4. **Authorize**: Client includes token in `Authorization: Bearer <token>` header
 5. **Access**: Protected endpoints validate token before processing
 

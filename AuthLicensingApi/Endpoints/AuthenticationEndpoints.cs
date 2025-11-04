@@ -117,24 +117,56 @@ public static class AuthenticationEndpoints
             return op;
         });
 
-        app.MapPost("/auth/check", async (AuthRequest req) =>
+        app.MapPost("/auth/check", async (AuthRequest req, ILogger<Program> logger) =>
         {
+            logger.LogInformation("Authentication attempt for username: {Username}", req.Username);
+
             var user = await users.Find(u => u.Username == req.Username).FirstOrDefaultAsync();
-            if (user is null) return Results.Unauthorized();
+            if (user is null)
+            {
+                logger.LogWarning("Authentication failed: User not found - {Username}", req.Username);
+                return Results.Unauthorized();
+            }
 
             if (string.IsNullOrWhiteSpace(user.PasswordHash) || user.PasswordHash.Length < 59 || !user.PasswordHash.StartsWith("$2"))
+            {
+                logger.LogError("Authentication failed: Malformed password hash for user - {Username}", req.Username);
                 return Results.Unauthorized(); // malformed or missing hash
+            }
 
             bool ok;
             try { ok = BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash); }
-            catch { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Password verification failed for user: {Username}", req.Username);
+                return Results.Unauthorized();
+            }
 
-            if (!ok) return Results.Unauthorized();
+            if (!ok)
+            {
+                logger.LogWarning("Authentication failed: Invalid password for user - {Username}", req.Username);
+                return Results.Unauthorized();
+            }
 
             var license = await licenses.Find(l => l.UserId == user.Id && l.Key == req.Key && l.Status == "active").FirstOrDefaultAsync();
-            if (license is null) return Results.Forbid();
-            if (license.Subscription is null) return Results.Problem("License has no subscription data", statusCode: 500);
-            if (license.Subscription.ExpiresAt <= DateTime.UtcNow) return Results.Forbid();
+            if (license is null)
+            {
+                logger.LogWarning("Authentication failed: License not found or inactive for user - {Username}, License: {LicenseKey}", req.Username, req.Key);
+                return Results.Forbid();
+            }
+
+            if (license.Subscription is null)
+            {
+                logger.LogError("License has no subscription data for user: {Username}, License: {LicenseKey}", req.Username, req.Key);
+                return Results.Problem("License has no subscription data", statusCode: 500);
+            }
+
+            if (license.Subscription.ExpiresAt <= DateTime.UtcNow)
+            {
+                logger.LogWarning("Authentication failed: License expired for user - {Username}, License: {LicenseKey}, Expired: {ExpiresAt}",
+                    req.Username, req.Key, license.Subscription.ExpiresAt);
+                return Results.Forbid();
+            }
 
             // Build JWT
             var claims = new[]
@@ -156,6 +188,9 @@ public static class AuthenticationEndpoints
 
             var jwtHandler = new JwtSecurityTokenHandler();
             var jwt = jwtHandler.WriteToken(token);
+
+            logger.LogInformation("Authentication successful for user: {Username}, Level: {Level}, License: {LicenseKey}",
+                user.Username, license.Subscription.Level, license.Key);
 
             return Results.Ok(new
             {
